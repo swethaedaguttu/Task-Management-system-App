@@ -2,7 +2,7 @@
 
 This repository contains a Flutter + Python (FastAPI) Task Management App.
 
-## Features implemented (per requirements)
+## Features implemented (Track A core)
 
 - Task model fields:
   - `Title` (text)
@@ -10,30 +10,37 @@ This repository contains a Flutter + Python (FastAPI) Task Management App.
   - `Due Date` (date, `YYYY-MM-DD`)
   - `Status` (`To-Do`, `In Progress`, `Done`)
   - `Blocked By` (optional dropdown referencing another existing task; stored as `blocked_by_id` in DB)
-- Main List View
-  - Search by **`Title` and `Description`** (server-side via REST `GET /tasks?q=...`, case-insensitive match on both fields, **debounced 300ms** after typing stops)
-  - Matching text is **highlighted** in task titles in the list (description matches are not highlighted)
-  - Filter by `Status` (server-side via REST `GET /tasks?status=...`)
-  - Pull-to-refresh on the task list
-  - If a task is blocked by another task that is not `Done`, its card is visually greyed out and shows the blocker’s title (`Blocked by: …`)
-- Task Creation/Edit
-  - Create + Edit screen with all required fields
-  - Draft persistence for *create*: typed text remains after accidentally navigating away, **minimizing the app**, and returning
+- Main list view
+  - Search by **`Title` and `Description`** (server-side `GET /tasks?q=...`, case-insensitive, **debounced 300ms** after typing stops)
+  - Matching text is **highlighted** in task titles (description matches are not highlighted)
+  - Filter by **Status** and **Priority** (server-side query params)
+  - Pull-to-refresh
+  - If a task is blocked by another task that is not `Done`, its card is greyed out and shows the blocker’s title (`Blocked by: …`)
+- Task creation / edit
+  - Create + edit with all required fields
+  - **Draft persistence (create only):** if the user leaves without saving, the form is restored on the next open (SharedPreferences). **After a successful create**, storage is cleared and the **next** “new task” opens **empty** (no stale draft).
 - CRUD
-  - Create, Read, Update, Delete tasks
+  - Create, read, update, delete via REST
 - Track A delay behavior
-  - Backend simulates a 2-second delay on all Task Creations and Updates
-  - Frontend shows a loading state and disables the `Save` button to prevent double-taps
+  - Backend: **2-second** simulated delay on **create** and **update**
+  - Frontend: loading state and disabled save to avoid double-submit
 
-- Backend robustness
-  - `blocked_by_id` uses `ON DELETE SET NULL` so deleting a blocker task does not break SQLite foreign keys
-  - SQLite runs with `PRAGMA foreign_keys=ON`
-  - `GET /` health-style JSON for quick checks
+### Additional product features (beyond minimum spec)
+
+- **Priority** (`High` / `Medium` / `Low`) on API, filters, and cards (colored stripe)
+- **Overdue** emphasis when due date is before today and status is not `Done`
+- **UI:** status/priority chips, extended FAB + bottom sheet for “new task”, polished task cards
+- **Feedback:** success messages use a **MaterialBanner** at the **top** of the screen (root `ScaffoldMessenger` key). Create/update/delete show appropriate confirmations.
+
+### Stretch goals (implemented)
+
+1. **Debounced search + title highlight** — aligned with the assignment’s optional “autocomplete-style” search (debounced server query + highlight in titles).
+2. **Recurring tasks** — `is_recurring` + `recurrence_type` (`daily` / `weekly`). When a recurring task is **updated** to `Done`, the API creates a **new** task (`To-Do`) with the next due date (+1 day or +7 days). Configured on the create/edit form.
+3. **Persistent drag-and-drop order** — `position` column; list ordered by `position`. **`PATCH /tasks/reorder`** with every task id once. Flutter uses **`ReorderableListView`** when **search and filters are cleared** (full list only); otherwise a normal list so the client can send a complete id list.
 
 ## Track selection
 
-- Track A: Full-Stack Builder (Flutter + FastAPI + SQLite)
-- Stretch goal: Not implemented
+- **Track A:** Full-Stack Builder (Flutter + FastAPI + SQLite)
 
 ## Setup (Backend)
 
@@ -62,15 +69,18 @@ This repository contains a Flutter + Python (FastAPI) Task Management App.
 ### API Base URL
 
 The Flutter app picks a default base URL automatically:
+
 - **Android emulator**: `http://10.0.2.2:8000` (host machine loopback)
 - **Other platforms (incl. iOS simulator / desktop / web dev)**: `http://localhost:8000`
 
 Override anytime:
+
 - `flutter run --dart-define=API_BASE_URL=http://YOUR_LAN_IP:8000` (common for a **physical Android device**)
 
 ### SQLite migration note
 
-If you created `tasks.db` before `ON DELETE SET NULL` was added, delete `backend/tasks.db` once and restart the API so the schema is recreated cleanly.
+- If you created `tasks.db` before `ON DELETE SET NULL` was added, delete `backend/tasks.db` once and restart the API so the schema is recreated cleanly.
+- The API adds new columns over time (`priority`, recurring fields, `position`) via startup migrations; if anything looks inconsistent, deleting `tasks.db` once and restarting the API is the fallback.
 
 ### Troubleshooting (Android emulator)
 
@@ -90,4 +100,3 @@ If you created `tasks.db` before `ON DELETE SET NULL` was added, delete `backend
   - “Implement Flutter UI with drafts stored in SharedPreferences and async save button disabling during loading.”
 - Known issue example (if applicable):
   - If an AI suggestion introduces an incorrect field name/type or enum value, it should be corrected to match the backend and required UI labels.
-
